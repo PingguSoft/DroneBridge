@@ -50,18 +50,22 @@ void generate_msp(unsigned short *newJoystickData) {
     monitor_databuffer->bytes[2] = 0x3c;
     monitor_databuffer->bytes[3] = 0x1c;
     monitor_databuffer->bytes[4] = 0xc8;
+
+    // in  (opentx) : AETR1234
+    // out (msp)    : AERT12345678 = RollPitchYawThrottle
+
     //Roll
     monitor_databuffer->bytes[5] = (uint8_t) (newJoystickData[0] & 0xFF);
     monitor_databuffer->bytes[6] = (uint8_t) ((newJoystickData[0] >> 8) & 0xFF);
     //Pitch
     monitor_databuffer->bytes[7] = (uint8_t) (newJoystickData[1] & 0xFF);
     monitor_databuffer->bytes[8] = (uint8_t) ((newJoystickData[1] >> 8) & 0xFF);
-    //Throttle
-    monitor_databuffer->bytes[9] = (uint8_t) (newJoystickData[2] & 0xFF);
-    monitor_databuffer->bytes[10] = (uint8_t) ((newJoystickData[2] >> 8) & 0xFF);
     //Yaw
-    monitor_databuffer->bytes[11] = (uint8_t) (newJoystickData[3] & 0xFF);
-    monitor_databuffer->bytes[12] = (uint8_t) ((newJoystickData[3] >> 8) & 0xFF);
+    monitor_databuffer->bytes[9] = (uint8_t) (newJoystickData[3] & 0xFF);
+    monitor_databuffer->bytes[10] = (uint8_t) ((newJoystickData[3] >> 8) & 0xFF);
+    //Throttle
+    monitor_databuffer->bytes[11] = (uint8_t) (newJoystickData[2] & 0xFF);
+    monitor_databuffer->bytes[12] = (uint8_t) ((newJoystickData[2] >> 8) & 0xFF);
     //AUX 1
     monitor_databuffer->bytes[13] = (uint8_t) (newJoystickData[4] & 0xFF);
     monitor_databuffer->bytes[14] = (uint8_t) ((newJoystickData[4] >> 8) & 0xFF);
@@ -109,18 +113,22 @@ void generate_mspv2(unsigned short *newJoystickData) {
     monitor_databuffer->bytes[5] = 0x00; // function
     monitor_databuffer->bytes[6] = 0x1c; // payload size
     monitor_databuffer->bytes[7] = 0x00; // payload size
+
+    // in  (opentx) : AETR1234
+    // out (msp)    : AERT12345678 = RollPitchYawThrottle
+
     //Roll
     monitor_databuffer->bytes[8] = (uint8_t) (newJoystickData[0] & 0xFF);
     monitor_databuffer->bytes[9] = (uint8_t) ((newJoystickData[0] >> 8) & 0xFF);
     //Pitch
     monitor_databuffer->bytes[10] = (uint8_t) (newJoystickData[1] & 0xFF);
     monitor_databuffer->bytes[11] = (uint8_t) ((newJoystickData[1] >> 8) & 0xFF);
-    //Throttle
-    monitor_databuffer->bytes[12] = (uint8_t) (newJoystickData[2] & 0xFF);
-    monitor_databuffer->bytes[13] = (uint8_t) ((newJoystickData[2] >> 8) & 0xFF);
     //Yaw
-    monitor_databuffer->bytes[14] = (uint8_t) (newJoystickData[3] & 0xFF);
-    monitor_databuffer->bytes[15] = (uint8_t) ((newJoystickData[3] >> 8) & 0xFF);
+    monitor_databuffer->bytes[12] = (uint8_t) (newJoystickData[3] & 0xFF);
+    monitor_databuffer->bytes[13] = (uint8_t) ((newJoystickData[3] >> 8) & 0xFF);
+    //Throttle
+    monitor_databuffer->bytes[14] = (uint8_t) (newJoystickData[2] & 0xFF);
+    monitor_databuffer->bytes[15] = (uint8_t) ((newJoystickData[2] >> 8) & 0xFF);
     //AUX 1
     monitor_databuffer->bytes[16] = (uint8_t) (newJoystickData[4] & 0xFF);
     monitor_databuffer->bytes[17] = (uint8_t) ((newJoystickData[4] >> 8) & 0xFF);
