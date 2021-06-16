@@ -343,6 +343,7 @@ int main(int argc, char *argv[]) {
                 break;
             case 'a':
                 cont_adhere_80211 = (int) strtol(optarg, NULL, 10);
+                break;
             case '?':
                 printf("Invalid commandline arguments. Use "
                        "\n\t-n <Network interface name - multiple <-n interface> possible> "
@@ -383,8 +384,13 @@ int main(int argc, char *argv[]) {
     db_socket_t raw_interfaces_rc[DB_MAX_ADAPTERS] = {0};
     db_socket_t raw_interfaces_telem[DB_MAX_ADAPTERS] = {0};
     for (int i = 0; i < num_inf; ++i) {
+        int len = chucksize;
+
         raw_interfaces_rc[i] = open_db_socket(adapters[i], comm_id, db_mode, bitrate_op, DB_DIREC_GROUND, DB_PORT_RC,
                                               frame_type);
+
+        // to drop the frame unprocessed packet
+        setsockopt(raw_interfaces_rc[i].db_socket, SOL_SOCKET, SO_RCVBUF, &len, sizeof(len));
         raw_interfaces_telem[i] = open_db_socket(adapters[i], comm_id, db_mode, bitrate_op, DB_DIREC_GROUND,
                                                  DB_PORT_CONTROLLER, frame_type);
     }
@@ -458,6 +464,8 @@ int main(int argc, char *argv[]) {
             FD_SET(raw_interfaces_rc[i].db_socket, &fd_socket_set);
             if (raw_interfaces_rc[i].db_socket > max_sd)
                 max_sd = raw_interfaces_rc[i].db_socket;
+
+            FD_SET(raw_interfaces_telem[i].db_socket, &fd_socket_set);
             if (raw_interfaces_telem[i].db_socket > max_sd)
                 max_sd = raw_interfaces_telem[i].db_socket;
         }
