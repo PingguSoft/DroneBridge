@@ -21,7 +21,8 @@ EXPERIMENTAL_DRIVERS = ['rtl8812au', 'rtl8814au', 'rtl8188eus']
 COMMON = 'COMMON'
 GROUND = 'GROUND'
 UAV = 'AIR'
-
+GROUND_AP_IP = '192.168.2.1'
+UAV_AP_IP    = '192.168.3.1'
 
 def parse_args():
     parser = argparse.ArgumentParser(description='Sets up the entire DroneBridge system including wireless adapters')
@@ -42,10 +43,11 @@ def main():
     print("Settings up network interfaces")
     setup_network_interfaces(setup_gnd, config)  # blocks until interface becomes available
     if setup_gnd and config.get(GROUND, 'wifi_ap') == 'Y':
-        setup_hotspot(config.get(GROUND, 'wifi_ap_if'))
+        setup_hotspot(True, config.get(GROUND, 'wifi_ap_if'))
     if setup_gnd and config.get(GROUND, 'eth_hotspot') == 'Y':
         setup_eth_hotspot()
-
+    if config.get(UAV, 'wifi_ap') == 'Y':
+        setup_hotspot(False, config.get(UAV, 'wifi_ap_if'))
 
 def setup_network_interfaces(setup_gnd: bool, config: configparser.ConfigParser):
     # READ THE SETTINGS
@@ -181,7 +183,7 @@ def waitfor_network_adapters(wifi_ap_blacklist=None):
     time.sleep(2)
 
 
-def setup_hotspot(interface):
+def setup_hotspot(setup_gnd: bool, interface):
     if interface == 'internal':
         interface = PI3_WIFI_NIC
     if pyw.isinterface(HOTSPOT_NIC):
@@ -193,14 +195,19 @@ def setup_hotspot(interface):
         time.sleep(1)
         card = pyw.getcard(HOTSPOT_NIC)
         pyw.up(card)
-        pyw.inetset(card, '192.168.2.1')
-        subprocess.run(["udhcpd -I 192.168.2.1 " + os.path.join(DRONEBRIDGE_BIN_PATH, "udhcpd-wifi.conf")], shell=True,
+
+        ap_ip = GROUND_AP_IP
+        if setup_gnd == False:
+            ap_ip = UAV_AP_IP
+            
+        pyw.inetset(card, ap_ip)
+        subprocess.run(["udhcpd -I " + ap_ip + " " + os.path.join(DRONEBRIDGE_BIN_PATH, "udhcpd-wifi.conf")], shell=True,
                        stdout=DEVNULL)
         subprocess.run(
             ["dos2unix -n " + os.path.join(DRONEBRIDGE_SETTINGS_PATH, "apconfig.txt") + " /tmp/apconfig.txt"],
             shell=True, stdout=DEVNULL)
         subprocess.Popen(["hostapd", "/tmp/apconfig.txt"], shell=False)
-        print("Setup wifi hotspot: " + card.dev + " AP-IP: 192.168.2.1")
+        print("Setup wifi hotspot: " + card.dev + " AP-IP: " + ap_ip)
     else:
         print("Error: Could not find AP-adapter: " + str(interface) + ", unable to enable access point")
 
