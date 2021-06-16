@@ -57,6 +57,7 @@ int main(int argc, char *argv[]) {
     char allow_rc_overwrite = 'N';
     int num_inf_rc = 0, rc_frequency = DB_DEFAULT_RC_FREQUENCY;
     char adapters[DB_MAX_ADAPTERS][IFNAMSIZ];
+    char joyconfg[128];
 
     // Command Line processing
     rc_int_indx = JOY_INTERFACE;
@@ -66,7 +67,7 @@ int main(int argc, char *argv[]) {
     comm_id = DEFAULT_V2_COMMID;
     frame_type = DB_FRAMETYPE_DEFAULT;
     opterr = 0;
-    while ((c = getopt(argc, argv, "n:j:m:b:g:v:o:t:c:a:")) != -1) {
+    while ((c = getopt(argc, argv, "n:j:m:b:g:v:o:t:c:a:r:f:")) != -1) {
         switch (c) {
             case 'n':
                 if (num_inf_rc < DB_MAX_ADAPTERS) {
@@ -101,6 +102,9 @@ int main(int argc, char *argv[]) {
             case 'r':
                 rc_frequency = (int) strtol(optarg, NULL, 10);
                 break;
+            case 'f':
+                strncpy(joyconfg, optarg, sizeof(joyconfg));
+                break;
             case '?':
                 printf("12ch RC via the DB-RC option (-v 5)\n");
                 printf("14ch RC using FC serial protocol (-v 1|2|4)\n");
@@ -117,7 +121,8 @@ int main(int argc, char *argv[]) {
                        "\n\t-b Bit rate in Mbps: (1|2|5|6|9|11|12|18|24|36|48|54)\n\t\t(bitrate option only "
                        "supported with Ralink chipsets), default is %i Mbps."
                        "\n\t-a <0|1> to enable/disable. Offsets the payload by some bytes so that it sits outside "
-                       "then 802.11 header.\n\t\t Set this to 1 if you are using a non DB-Rasp Kernel!\n",
+                       "then 802.11 header.\n\t\t Set this to 1 if you are using a non DB-Rasp Kernel!"
+                       "\n\t-f joystick mapping config file\n",
                        DB_DEFAULT_RC_FREQUENCY, bitrate_op);
                 exit(0);
             default:
@@ -153,7 +158,7 @@ int main(int argc, char *argv[]) {
         LOG_SYS_STD(LOG_INFO, "DB_CONTROL_GND: Choosing OpenTX-Config\n");
         strcpy(calibrate_comm, DEFAULT_OPENTX_CALIBRATION);
         do_calibration(calibrate_comm, rc_int_indx);
-        opentx(rc_int_indx, sleep_time);
+        opentx(rc_int_indx, sleep_time, joyconfg);
     }
     exit(0);
 }

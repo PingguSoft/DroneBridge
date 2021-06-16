@@ -1,0 +1,12 @@
+aileron     axis2
+elevator    axis3    invert
+throttle    axis1    invert
+rudder      axis0
+aux1        button13
+aux2        button8
+aux3        button4  button5
+aux4        button12
+aux5        button9
+aux6        button6  button7
+aux7        axis4
+aux8        axis5

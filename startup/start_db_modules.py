@@ -18,6 +18,7 @@ UAV = 'AIR'
 GND_STRING_TAG = 'DroneBridge GND: '
 UAV_STRING_TAG = 'DroneBridge UAV: '
 DRONEBRIDGE_BIN_PATH = os.path.join(os.sep, "home", "pi", "DroneBridge")
+DRONEBRIDGE_SETTINGS_PATH = os.path.join(os.sep, "DroneBridge")
 
 
 def parse_arguments():
@@ -93,7 +94,7 @@ def start_gnd_modules():
         comm_control = [os.path.join(DRONEBRIDGE_BIN_PATH, 'control', 'control_ground'), "-j",
                         str(joy_interface), "-m", "m", "-v", str(rc_proto), "-o", str(en_rc_overwrite), "-c",
                         str(communication_id), "-t", str(frametype), "-b", str(get_bit_rate(datarate)), "-a",
-                        str(compatibility_mode)]
+                        str(compatibility_mode), "-f", os.path.join(DRONEBRIDGE_SETTINGS_PATH, 'joyconfig.txt')]
         comm_control.extend(interface_control.split())
         control_module_process = Popen(comm_control, shell=False, stdin=None, stdout=None, stderr=None, close_fds=True)
 
