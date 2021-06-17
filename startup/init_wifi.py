@@ -8,6 +8,7 @@ import subprocess
 import sys
 import time
 from subprocess import DEVNULL
+import RPi.GPIO as GPIO
 
 from Chipset import is_atheros_card, is_realtek_card
 from common_helpers import read_dronebridge_config, get_bit_rate, HOTSPOT_NIC, PI3_WIFI_NIC
@@ -23,6 +24,7 @@ GROUND = 'GROUND'
 UAV = 'AIR'
 GROUND_AP_IP = '192.168.2.1'
 UAV_AP_IP    = '192.168.3.1'
+UAV_AP_GPIO  = 21
 
 def parse_args():
     parser = argparse.ArgumentParser(description='Sets up the entire DroneBridge system including wireless adapters')
@@ -42,12 +44,20 @@ def main():
         print("---- Initializing adapters for UAV (v" + str(get_firmware_id()) + ")")
     print("Settings up network interfaces")
     setup_network_interfaces(setup_gnd, config)  # blocks until interface becomes available
-    if setup_gnd and config.get(GROUND, 'wifi_ap') == 'Y':
-        setup_hotspot(True, config.get(GROUND, 'wifi_ap_if'))
-    if setup_gnd and config.get(GROUND, 'eth_hotspot') == 'Y':
-        setup_eth_hotspot()
-    if config.get(UAV, 'wifi_ap') == 'Y':
-        setup_hotspot(False, config.get(UAV, 'wifi_ap_if'))
+
+    GPIO.setmode(GPIO.BCM)
+    GPIO.setup(UAV_AP_GPIO, GPIO.IN, pull_up_down=GPIO.PUD_UP)
+    if GPIO.input(UAV_AP_GPIO) == GPIO.HIGH:
+        if setup_gnd:
+            if config.get(GROUND, 'wifi_ap') == 'Y':
+                setup_hotspot(True, config.get(GROUND, 'wifi_ap_if'))
+            if config.get(GROUND, 'eth_hotspot') == 'Y':
+                setup_eth_hotspot()
+        else:
+            if config.get(UAV, 'wifi_ap') == 'Y':
+                setup_hotspot(False, config.get(UAV, 'wifi_ap_if'))
+    GPIO.cleanup()
+
 
 def setup_network_interfaces(setup_gnd: bool, config: configparser.ConfigParser):
     # READ THE SETTINGS
@@ -64,6 +74,9 @@ def setup_network_interfaces(setup_gnd: bool, config: configparser.ConfigParser)
         list_man_nics[3] = config.get(GROUND, 'nic_4')
         list_man_freqs[3] = config.getint(GROUND, 'frq_4')
         wifi_ap_blacklist.append(config.get(GROUND, 'wifi_ap_if'))
+        wifi_ap_blacklist.append(HOTSPOT_NIC)
+    else:
+        wifi_ap_blacklist.append(config.get(UAV, 'wifi_ap_if'))
         wifi_ap_blacklist.append(HOTSPOT_NIC)
 
     if config.has_option(COMMON, 'blacklist_ap'):
@@ -197,11 +210,12 @@ def setup_hotspot(setup_gnd: bool, interface):
         pyw.up(card)
 
         ap_ip = GROUND_AP_IP
+        conf_file = "udhcpd-wifi-gnd.conf"
         if setup_gnd == False:
             ap_ip = UAV_AP_IP
-            
+            conf_file = "udhcpd-wifi-uav.conf"
         pyw.inetset(card, ap_ip)
-        subprocess.run(["udhcpd -I " + ap_ip + " " + os.path.join(DRONEBRIDGE_BIN_PATH, "udhcpd-wifi.conf")], shell=True,
+        subprocess.run(["udhcpd -I " + ap_ip + " " + os.path.join(DRONEBRIDGE_BIN_PATH, conf_file)], shell=True,
                        stdout=DEVNULL)
         subprocess.run(
             ["dos2unix -n " + os.path.join(DRONEBRIDGE_SETTINGS_PATH, "apconfig.txt") + " /tmp/apconfig.txt"],
