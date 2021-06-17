@@ -165,7 +165,7 @@ void mapData(int16_t *pInJoy, uint16_t *pOutTx) {
         uint16_t div = (1 << joyMaps[i].ctr) - 1;
 
         if (joyMaps[i].ctr == 0x80) {   // axis
-            pOutTx[i] = normalize_opentx(pInJoy[joyMaps[i].idx[0]]) * joyMaps[i].idx[1];
+            pOutTx[i] = normalize_opentx(pInJoy[joyMaps[i].idx[0]] * joyMaps[i].idx[1]);
         } else {                        // button
             uint16_t val = 0;
 
