@@ -259,7 +259,9 @@ void write_to_serial(int serial_sock, uint8_t *data, size_t data_len, char *log_
     if (data_len > 0 && serial_sock > 0) {
         int sentbytes = (int) write(serial_sock, data, (size_t) data_len);
         int errsv = errno;
-        tcdrain(serial_sock);
+
+        //tcdrain(serial_sock); // tcdrain will block the process, no need to call tcdrain
+
         if (sentbytes <= 0) {
             LOG_SYS_STD(LOG_WARNING, "DB_CONTROL_AIR: Could not write (%s) to serial interface %s\n", log_ident,
                     strerror(errsv));
@@ -384,13 +386,8 @@ int main(int argc, char *argv[]) {
     db_socket_t raw_interfaces_rc[DB_MAX_ADAPTERS] = {0};
     db_socket_t raw_interfaces_telem[DB_MAX_ADAPTERS] = {0};
     for (int i = 0; i < num_inf; ++i) {
-        int len = chucksize;
-
         raw_interfaces_rc[i] = open_db_socket(adapters[i], comm_id, db_mode, bitrate_op, DB_DIREC_GROUND, DB_PORT_RC,
                                               frame_type);
-
-        // to drop the frame unprocessed packet
-        setsockopt(raw_interfaces_rc[i].db_socket, SOL_SOCKET, SO_RCVBUF, &len, sizeof(len));
         raw_interfaces_telem[i] = open_db_socket(adapters[i], comm_id, db_mode, bitrate_op, DB_DIREC_GROUND,
                                                  DB_PORT_CONTROLLER, frame_type);
     }
