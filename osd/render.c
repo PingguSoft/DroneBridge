@@ -4,21 +4,24 @@
 // cpu  
 // bars ▁▂▃▄▅▆▇█
 // arrows ↥ ↦ ↤    
-// warning              
+// warning             
 // down/up stream  
 // RSSI     
 // cam  
 // double caret    
-// please wait  
+// please wait 
 // wind      
-// thermometer  
+// thermometer 
 // time   
 // pressure  
 // speed  
 // windhose    
-// cog    
+// cog   
 #include <stdint.h>
 #include <sys/time.h>
+#include <sys/ioctl.h>
+#include <linux/fb.h>
+#include <linux/kd.h>
 #include "render.h"
 #include "telemetry.h"
 #include "osdconfig.h"
@@ -80,6 +83,36 @@ void setfillstroke() {
 }
 
 
+void clearFB() {
+    struct fb_var_screeninfo vinfo;
+    unsigned long int screensize;
+    unsigned int *pBuf;
+    int    fd;
+
+    // disable cursor
+    fd = open("/dev/tty1", O_RDWR);
+    if (fd > 0) {
+        ioctl(fd, KDSETMODE, KD_GRAPHICS);
+        close(fd);
+    }
+
+    // clear frame buffer
+    fd = open("/dev/fb0", O_RDWR);
+    if (fd > 0) {
+        if (ioctl(fd, FBIOGET_VSCREENINFO, &vinfo) >= 0) {
+            screensize = vinfo.xres * vinfo.yres * vinfo.bits_per_pixel / 8 ;
+            fprintf(stderr, "xres:%d, yres:%d, bpp:%d\n", vinfo.xres, vinfo.yres, vinfo.bits_per_pixel);
+            pBuf = (unsigned int *)mmap(0, screensize, PROT_WRITE, MAP_SHARED, fd, 0);
+            if (pBuf) {
+                memset(pBuf, 0x00, screensize);
+                munmap(pBuf, screensize);
+            }
+        }
+        close(fd);
+    }
+}
+
+
 void render_init() {
     char filename[100] = "/DroneBridge/osdfonts/";
     InitShapes(&width, &height);
@@ -99,6 +132,7 @@ void render_init() {
 
     home_counter = 0;
 //  vgSeti(VG_MATRIX_MODE, VG_MATRIX_GLYPH_USER_TO_SURFACE);
+    clearFB();
 }
 
 
