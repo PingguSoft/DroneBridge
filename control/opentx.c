@@ -33,23 +33,46 @@
 #include "parameter.h"
 #include "rc_ground.h"
 
+#define NUM_BUTTON_COMB     4
+#define TYPE_AXIS_NORMAL    1
+#define TYPE_AXIS_INVERT    2
+#define TYPE_BUTTON         3
+#define TYPE_BUTTON_TOGGLE  4
+#define TYPE_SWITCH         5
+
 static volatile int keep_running = 1;
 static uint8_t  ctrAxes = 0;
 static uint8_t  ctrBtns = 0;
 
-struct _map {
-    uint8_t ctr;       // 0x80:axis, others:button combinations
-    int8_t  idx[3];
+struct joymap {
+    uint8_t  ctr;
+    uint8_t  type[NUM_BUTTON_COMB];
+    int8_t   idx[NUM_BUTTON_COMB];
+    uint16_t lastState[NUM_BUTTON_COMB];
+    uint16_t lastBtn[NUM_BUTTON_COMB];
 };
-static struct _map joyMaps[NUM_CHANNELS];
+
+static struct joymap _joyMaps[NUM_CHANNELS];
 
 
 void custom_signal_handler(int dummy) {
     keep_running = 0;
 }
 
+char *nextParam(char *p) {
+    // find space
+    while (*p != '\0' && *p != ' ' && *p != '\t') {
+        p++;
+    }
+    // find non space
+    while (*p != '\0' && (*p == ' ' || *p == '\t')) {
+        p++;
+    }
+    return p;
+}
+
 void loadCfg(char *cfg) {
-    const char *label[] = {
+    const char *label[NUM_CHANNELS] = {
         "aileron",
         "elevator",
         "throttle",
@@ -66,29 +89,38 @@ void loadCfg(char *cfg) {
         "aux10"
     };
 
+    memset(_joyMaps, 0, sizeof(_joyMaps));
     FILE *fp = fopen(cfg, "rt");
     if (fp) {
         char line[100];
-        char arg[4][30];
-
-        memset(&joyMaps, 0x0, sizeof(joyMaps));
+        char *ptr;
 
         while (fgets(line, sizeof(line), fp) > 0) {
-            memset(arg, 0, sizeof(arg));
-            sscanf(line, "%s %s %s %s", arg[0], arg[1], arg[2], arg[3]);
-
-            for (int i = 0; i < sizeof(label) / sizeof(char *); i++) {
-                if (strncmp(arg[0], label[i], strlen(label[i])) == 0) {
-                    if (strncmp(arg[1], "axis", 4) == 0) {
-                        joyMaps[i].ctr    = 0x80;
-                        joyMaps[i].idx[0] = atoi(&arg[1][4]);
-                        joyMaps[i].idx[1] = (strncmp(arg[2], "invert", 6) == 0) ? -1 : 1;   // axis invert
+            ptr = line;
+            for (int i = 0; i < NUM_CHANNELS; i++) {
+                if (strncmp(ptr, label[i], strlen(label[i])) == 0) {
+                    ptr = nextParam(ptr);
+                    if (strncmp(ptr, "axis", 4) == 0) {
+                        _joyMaps[i].ctr     = 1;
+                        _joyMaps[i].type[0] = (ptr[4] == '-') ? TYPE_AXIS_INVERT : TYPE_AXIS_NORMAL;
+                        _joyMaps[i].idx[0]  = atoi(&ptr[5]);
                     } else {
-                        for (int j = 1; j < 4; j++) {
-                            if (strncmp(arg[j], "button", 6) == 0) {
-                                joyMaps[i].ctr++;
-                                joyMaps[i].idx[j - 1] = 8 + atoi(&arg[j][6]);
+                        for (int j = 0; j < NUM_BUTTON_COMB; j++) {
+                            if (strncmp(ptr, "button", 6) == 0) {
+                                _joyMaps[i].ctr++;
+                                if (ptr[6] == '^') {
+                                    _joyMaps[i].type[j] = TYPE_BUTTON_TOGGLE;
+                                    _joyMaps[i].idx[j]  = 8 + atoi(&ptr[7]);
+                                } else {
+                                    _joyMaps[i].type[j] = TYPE_BUTTON;
+                                    _joyMaps[i].idx[j]  = 8 + atoi(&ptr[6]);
+                                }
+                            } else if (strncmp(ptr, "switch", 6) == 0) {
+                                _joyMaps[i].ctr++;
+                                _joyMaps[i].type[j] = TYPE_SWITCH;
+                                _joyMaps[i].idx[j]  = 8 + atoi(&ptr[6]);
                             }
+                            ptr = nextParam(ptr);
                         }
                     }
                 }
@@ -96,22 +128,52 @@ void loadCfg(char *cfg) {
         }
         fclose(fp);
     } else {
-        // default idx
-        for (int i = 0; i < sizeof(label) / sizeof(char *); i++) {
-            if (i < 8) {
-                joyMaps[i].ctr    = 0x80;
-                joyMaps[i].idx[0] = i;
-                joyMaps[i].idx[1] = 1;
+        // default mapping
+        for (int i = 0; i < NUM_CHANNELS; i++) {
+            if (i < 4) {
+                _joyMaps[i].ctr     = 1;
+                _joyMaps[i].type[0] = TYPE_AXIS_NORMAL;
+                _joyMaps[i].idx[0]  = i;
             } else {
-                joyMaps[i].ctr    = 1;
-                joyMaps[i].idx[0] = i;
+                _joyMaps[i].ctr     = 1;
+                _joyMaps[i].type[0] = TYPE_BUTTON;
+                _joyMaps[i].idx[0]  = 8 + i;
             }
         }
     }
-
 #if 1
     for (int i = 0; i < sizeof(label) / sizeof(char *); i++) {
-        printf("%s %s %2d %2d %2d\n", label[i], ((joyMaps[i].ctr == 0x80) ? "axis" : "btn"), joyMaps[i].idx[0], joyMaps[i].idx[1], joyMaps[i].idx[2]);
+        if (_joyMaps[i].ctr == 0)
+            continue;
+            
+        printf("%-8s ", label[i]);
+        
+        char *type;
+        for (int j = 0; j < _joyMaps[i].ctr; j++) {
+            switch (_joyMaps[i].type[j]) {
+                case TYPE_AXIS_NORMAL:
+                    type = "axis +";
+                    break;
+                    
+                case TYPE_AXIS_INVERT:
+                    type = "axis -";
+                    break;
+                    
+                case TYPE_BUTTON:
+                    type = "button";
+                    break;
+                    
+                case TYPE_BUTTON_TOGGLE:
+                    type = "button^";
+                    break;
+                    
+                case TYPE_SWITCH:
+                    type = "switch";
+                    break;
+            }
+            printf("%8s(%2d) ", type, _joyMaps[i].idx[j]);
+        }
+        printf("\n");
     }
 #endif
 }
@@ -162,19 +224,46 @@ uint16_t normalize_opentx(int16_t value) {
 
 void mapData(int16_t *pInJoy, uint16_t *pOutTx) {
     for (int i = 0; i < NUM_CHANNELS; i++) {
-        uint16_t div = (1 << joyMaps[i].ctr) - 1;
+        if (_joyMaps[i].ctr == 0) {
+            pOutTx[i] = 1000;
+        } else if (_joyMaps[i].type[0] < TYPE_BUTTON) {
+            int val = pInJoy[_joyMaps[i].idx[0]];
 
-        if (joyMaps[i].ctr == 0x80) {   // axis
-            pOutTx[i] = normalize_opentx(pInJoy[joyMaps[i].idx[0]] * joyMaps[i].idx[1]);
-        } else {                        // button
-            uint16_t val = 0;
-
-            for (int j = 0; j < joyMaps[i].ctr; j++) {
-                val |= (pInJoy[joyMaps[i].idx[j]] << j);
+            if (_joyMaps[i].type[0] == TYPE_AXIS_INVERT) {
+                val = -val;
             }
-            pOutTx[i] = 1000 + (1000 * val / div);
+            pOutTx[i] = normalize_opentx(val);
+            if (i < 4) {
+                LOG_SYS_STD(LOG_INFO, "%d:%4d, ", i, pOutTx[i]);
+            } else {
+                LOG_SYS_STD(LOG_INFO, "A%d:%4d, ", i - 3, pOutTx[i]);
+            }
+        } else {
+            uint16_t div   = (1 << _joyMaps[i].ctr) - 1;
+            uint16_t round = div - 1;
+            uint16_t btnVal;
+            uint16_t newVal = 0;            
+            uint16_t toggled;
+
+            for (int j = 0; j < _joyMaps[i].ctr; j++) {
+                btnVal  = pInJoy[_joyMaps[i].idx[j]];
+                toggled = _joyMaps[i].lastState[j] ^ btnVal;
+                _joyMaps[i].lastState[j] = btnVal;
+
+                if (_joyMaps[i].type[j] == TYPE_BUTTON_TOGGLE) {
+                     if (btnVal > 0 && toggled > 0) {
+                        _joyMaps[i].lastBtn[j] = !_joyMaps[i].lastBtn[j];
+                     }
+                     btnVal = _joyMaps[i].lastBtn[j];
+                }
+                newVal |= (btnVal << j);
+            }
+            
+            pOutTx[i] = 1000 + (1000 * newVal + round) / div;
+            LOG_SYS_STD(LOG_INFO, "A%d:%4d, ", i - 3, pOutTx[i]);
         }
     }
+    LOG_SYS_STD(LOG_INFO, "\n");
 }
 
 /**

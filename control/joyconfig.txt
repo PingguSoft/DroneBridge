@@ -1,0 +1,27 @@
+#
+# analog axis channels, +means normal axis, -means inverted axis
+#
+aileron     axis+3
+elevator    axis-4
+throttle    axis-1
+rudder      axis+0
+
+#
+# aux channels (up to 8), up to 4 buttons or switches can be combined
+#
+aux1        switch8
+aux2        switch13
+aux3        switch12
+aux4        switch9
+
+#
+# ^ means toggle buttons, button is toggled when pressed
+#
+aux5        button^0 button^1 switch4 switch5
+aux6        button^2 button^3 switch6 switch7
+
+#
+# DPAD mapped to aux channels
+#
+aux7        axis+6
+aux8        axis+7
